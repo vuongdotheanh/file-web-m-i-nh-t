@@ -3,6 +3,7 @@ import re
 import uvicorn
 import smtplib
 import random
+from datetime import datetime, timedelta    
 from json import dumps as json_dumps
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -226,16 +227,87 @@ async def update_profile(data: dict, db: Session = Depends(get_db), current_user
     db.commit()
     return {"status": "success", "message": "Cập nhật thành công!"}
 
-# --- API QUẢN LÝ PHÒNG & ĐẶT LỊCH (GIỮ NGUYÊN) ---
+# API  ĐẶT LỊCH
+# --- API ĐẶT LỊCH (ĐÃ SỬA: HIỂN THỊ GIỜ VIỆT NAM KHI BÁO LỖI) ---
 @app.post("/api/bookings/create")
 async def create_booking(data: dict, db: Session = Depends(get_db), current_user: User = Depends(require_staff)):
+    # 1. Kiểm tra phòng
     room = db.query(Classroom).filter(Classroom.id == data['room_id']).first()
-    if not room or room.status == 'Maintenance': return {"status": "error", "message": "Phòng không khả dụng!"}
+    if not room: return {"status": "error", "message": "Phòng không tồn tại!"}
+    if room.status == 'Maintenance': return {"status": "error", "message": "Phòng đang bảo trì, không thể đặt!"}
+
+    # 2. Xử lý thời gian Yêu cầu
+    try:
+        # Chuyển chuỗi thời gian client gửi lên thành đối tượng Python (UTC)
+        req_start = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
+        
+        # Tính toán thời lượng
+        duration_text = data['duration_display']
+        req_hours = 0.0
+        if "Giờ" in duration_text:
+            parts = duration_text.split(" Giờ")
+            req_hours += int(parts[0])
+            if "Phút" in parts[1]: req_hours += 0.5
+        elif "Phút" in duration_text:
+             req_hours = 0.5
+        else:
+             req_hours = 1.0 
+             
+        req_end = req_start + timedelta(hours=req_hours)
+        
+    except Exception as e:
+        print(f"Lỗi parse time: {e}")
+        return {"status": "error", "message": "Lỗi định dạng thời gian!"}
+
+    # 3. Quét lịch cũ để tìm xung đột
+    existing_bookings = db.query(Booking).filter(Booking.room_id == data['room_id']).all()
     
+    for b in existing_bookings:
+        try:
+            b_start = datetime.fromisoformat(b.start_time.replace('Z', '+00:00'))
+            
+            # Tính thời gian kết thúc của lịch cũ
+            b_dur_text = b.duration_hours
+            b_hours = 0.0
+            if "Giờ" in b_dur_text:
+                parts = b_dur_text.split(" Giờ")
+                b_hours += int(parts[0])
+                if "Phút" in parts[1]: b_hours += 0.5
+            elif "Phút" in b_dur_text:
+                b_hours = 0.5
+            else:
+                b_hours = float(b_dur_text) if b_dur_text else 1.0
+
+            b_end = b_start + timedelta(hours=b_hours)
+            
+            # --- KIỂM TRA TRÙNG LỊCH ---
+            if req_start < b_end and req_end > b_start:
+                
+                # SỬA LẠI CHỖ NÀY: Cộng thêm 7 tiếng để hiển thị ra giờ Việt Nam cho dễ hiểu
+                vn_start = b_start + timedelta(hours=7)
+                vn_end = b_end + timedelta(hours=7)
+                
+                conflict_msg = f"Bị trùng! Đã có lịch của {b.booker_name} ({vn_start.strftime('%H:%M')} - {vn_end.strftime('%H:%M')})"
+                return {"status": "error", "message": conflict_msg}
+                
+        except Exception:
+            continue 
+
+    # 4. Lưu lịch mới
     booker_display = current_user.full_name if current_user.full_name else current_user.username
-    db.add(Booking(room_id=data['room_id'], user_id=current_user.id, booker_name=booker_display, start_time=data['start_time'], duration_hours=data['duration_display']))
+    
+    new_booking = Booking(
+        room_id=data['room_id'], 
+        user_id=current_user.id, 
+        booker_name=booker_display, 
+        start_time=data['start_time'], 
+        duration_hours=data['duration_display'], 
+        status="Confirmed"
+    )
+    db.add(new_booking)
     db.commit()
-    return {"status": "success"}
+    
+    return {"status": "success", "message": "Đặt phòng thành công!"}
 
 @app.post("/api/bookings/delete")
 async def delete_booking(data: dict, db: Session = Depends(get_db), current_user: User = Depends(require_staff)):
@@ -260,14 +332,38 @@ async def create_room(data: dict, db: Session = Depends(get_db), current_user: U
     db.commit()
     return {"status": "success"}
 
+# --- API CẬP NHẬT PHÒNG (ĐÃ NÂNG CẤP: TỰ ĐỘNG XÓA LỊCH KHI BẢO TRÌ) ---
 @app.post("/api/rooms/update")
 async def update_room(data: dict, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    # 1. Tìm phòng cần sửa
     r = db.query(Classroom).filter(Classroom.id == data['room_id']).first()
-    if r:
-        r.room_name = data.get('room_name'); r.capacity = data.get('capacity'); r.equipment = data.get('equipment'); r.status = data.get('status')
-        db.commit()
-        return {"status": "success"}
-    return {"status": "error"}
+    if not r:
+        return {"status": "error", "message": "Không tìm thấy phòng!"}
+
+    # 2. Lấy trạng thái mới
+    new_status = data.get('status')
+
+    # 3. KIỂM TRA LOGIC BẢO TRÌ
+    # Nếu chuyển từ trạng thái khác sang 'Maintenance' -> Xóa hết lịch đặt
+    if new_status == 'Maintenance':
+        # Lệnh này sẽ xóa toàn bộ Booking có room_id tương ứng
+        deleted_count = db.query(Booking).filter(Booking.room_id == r.id).delete()
+        print(f"Đã hủy {deleted_count} lịch đặt do phòng {r.room_name} bảo trì.")
+
+    # 4. Cập nhật thông tin mới vào Database
+    r.room_name = data.get('room_name', r.room_name)
+    r.capacity = data.get('capacity', r.capacity)
+    r.equipment = data.get('equipment', r.equipment)
+    r.status = new_status
+    
+    db.commit()
+    
+    if new_status == 'Maintenance':
+        msg = "Đã chuyển sang bảo trì và hủy tất cả lịch đặt của phòng này!"
+    else:
+        msg = "Cập nhật thông tin phòng thành công!"
+        
+    return {"status": "success", "message": msg}
 
 @app.post("/api/rooms/delete")
 async def delete_room(data: dict, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):

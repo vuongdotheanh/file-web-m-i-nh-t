@@ -174,7 +174,16 @@
         const classrooms = {{ classrooms | tojson | safe }};
         const rawBookings = {{ bookings | tojson | safe }};
         
-        document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('scheduleDate').value// --- SỬA ĐOẠN KHỞI TẠO NGÀY ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const savedDate = urlParams.get('date'); // Lấy ngày từ trên thanh địa chỉ (nếu có)
+
+        if (savedDate) {
+            document.getElementById('scheduleDate').value = savedDate;
+        } else {
+            // Nếu không có thì mới lấy ngày hôm nay
+            document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
+        }
 
         const bookings = rawBookings.map(b => {
             try {
@@ -283,14 +292,20 @@
             document.getElementById('cancelModal').style.display = 'block';
         }
 
-        async function confirmCancel() {
+       async function confirmCancel() {
             const bookingId = document.getElementById('cancelBookingId').value;
+            // Lấy ngày hiện tại
+            const currentDate = document.getElementById('scheduleDate').value;
+
             const res = await fetch('/api/bookings/delete', {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ booking_id: bookingId })
             });
             const result = await res.json();
             if(result.status === 'success') {
-                Swal.fire('Đã hủy!', 'Lịch đặt đã được xóa.', 'success').then(() => window.location.reload());
+                Swal.fire('Đã hủy!', 'Lịch đặt đã được xóa.', 'success').then(() => {
+                    // Reload lại đúng ngày đang xem
+                    window.location.href = `/booking-scheduler?date=${currentDate}`;
+                });
             } else {
                 Swal.fire('Lỗi!', result.message, 'error');
             }
@@ -372,11 +387,24 @@
             e.preventDefault();
             const data = Object.fromEntries(new FormData(e.target).entries());
             data.room_id = parseInt(data.room_id);
+            
+            // Lấy ngày đang chọn để lát nữa reload lại đúng ngày đó
+            const currentDate = document.getElementById('scheduleDate').value; 
+
             let res = await fetch('/api/bookings/create', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
             const result = await res.json();
+
             if(result.status === 'success') {
                 closeModal('bookingModal');
-                Swal.fire({ title: 'Đặt thành công!', text: 'Lịch đặt đã được ghi nhận.', icon: 'success', confirmButtonColor: '#06d6a0' }).then(() => window.location.reload());
+                Swal.fire({ 
+                    title: 'Đặt thành công!', 
+                    text: 'Lịch đặt đã được ghi nhận.', 
+                    icon: 'success', 
+                    confirmButtonColor: '#06d6a0' 
+                }).then(() => {
+                    // --- SỬA Ở ĐÂY: Thay vì reload() thường, ta chuyển hướng kèm theo ngày ---
+                    window.location.href = `/booking-scheduler?date=${currentDate}`;
+                });
             } else {
                 Swal.fire('Lỗi!', result.message, 'error');
             }
