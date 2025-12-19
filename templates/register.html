@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Đăng ký tài khoản - EduManager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body.login-page {
+            display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9effd 100%);
+        }
+        /* Style cho nút Lấy mã nằm cạnh Input */
+        .input-group-btn {
+            display: flex; gap: 10px;
+        }
+        .btn-small {
+            white-space: nowrap;
+            background: #2b2d42; color: white; border: none; border-radius: 10px;
+            padding: 0 15px; font-weight: bold; cursor: pointer; transition: 0.3s;
+        }
+        .btn-small:hover { background: #4361ee; }
+        .btn-small:disabled { background: #ccc; cursor: not-allowed; }
+        
+        /* Ẩn vùng OTP đi ban đầu */
+        #otp-area { display: none; animation: fadeIn 0.5s; background: #e0e7ff; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        @keyframes fadeIn { from{opacity:0; transform:translateY(-10px)} to{opacity:1; transform:translateY(0)} }
+    </style>
+</head>
+<body class="login-page">
+    <div class="login-card" style="max-width: 500px;">
+        <div class="login-header">
+            <div class="logo"><i class="fas fa-user-plus"></i><span>EduManager</span></div>
+            <h2>Đăng Ký Tài Khoản</h2>
+        </div>
+        
+        <div class="login-form">
+            <div class="form-group">
+                <label>Họ và tên</label>
+                <input type="text" id="reg-fullname" placeholder="Nguyễn Văn A">
+            </div>
+
+            <div class="form-group">
+                <label>Tên đăng nhập</label>
+                <input type="text" id="reg-user" placeholder="username123">
+            </div>
+
+            <div class="form-group">
+                <label>Email xác thực</label>
+                <div class="input-group-btn">
+                    <input type="email" id="reg-email" placeholder="email@example.com">
+                    <button id="btn-get-otp" class="btn-small" onclick="sendOTP()">
+                        <i class="fas fa-paper-plane"></i> Lấy mã
+                    </button>
+                </div>
+            </div>
+
+            <div id="otp-area">
+                <label style="color: #4361ee; font-weight: bold;">Nhập mã OTP (6 số trong Email):</label>
+                <input type="text" id="reg-otp" placeholder="XXXXXX" style="text-align: center; letter-spacing: 3px; font-weight: bold; margin-top: 5px;">
+                <input type="hidden" id="server-otp-hash"> </div>
+
+            <div class="form-group">
+                <label>Số điện thoại</label>
+                <input type="text" id="reg-phone" placeholder="09xxxxxxx">
+            </div>
+
+            <div class="form-group">
+                <label>Mật khẩu</label>
+                <input type="password" id="reg-pass" placeholder="Mật khẩu...">
+            </div>
+
+            <div class="form-group">
+                <label>Xác nhận mật khẩu</label>
+                <input type="password" id="reg-confirm" placeholder="Nhập lại mật khẩu...">
+            </div>
+
+            <button id="btn-register" onclick="handleRegister()" class="btn-login" disabled style="opacity: 0.6;">Đăng Ký</button>
+        </div>
+
+        <div class="login-footer">
+            <p>Đã có tài khoản? <a href="/">Đăng nhập</a></p>
+        </div>
+    </div>
+
+    <script>
+        async function sendOTP() {
+            const u = document.getElementById('reg-user').value;
+            const e = document.getElementById('reg-email').value;
+            const btn = document.getElementById('btn-get-otp');
+
+            if(!u || !e) {
+                Swal.fire('Thiếu thông tin', 'Vui lòng nhập Tên đăng nhập và Email trước!', 'warning');
+                return;
+            }
+
+            // Hiệu ứng loading
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang gửi...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/register/send-otp', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: u, email: e})
+                });
+                const data = await res.json();
+
+                if(data.status === 'success') {
+                    Swal.fire('Đã gửi mã!', 'Vui lòng kiểm tra Email để lấy mã OTP.', 'success');
+                    
+                    // Hiện ô nhập OTP
+                    document.getElementById('otp-area').style.display = 'block';
+                    document.getElementById('server-otp-hash').value = data.server_otp; // Lưu mã
+                    
+                    // Mở khóa nút Đăng ký
+                    document.getElementById('btn-register').disabled = false;
+                    document.getElementById('btn-register').style.opacity = '1';
+
+                    // Đổi trạng thái nút lấy mã
+                    btn.innerHTML = '<i class="fas fa-check"></i> Đã gửi';
+                } else {
+                    Swal.fire('Lỗi', data.message, 'error');
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Lấy mã';
+                    btn.disabled = false;
+                }
+            } catch(err) {
+                Swal.fire('Lỗi', 'Không kết nối được server', 'error');
+                btn.disabled = false;
+            }
+        }
+
+        async function handleRegister() {
+            const otpInput = document.getElementById('reg-otp').value;
+            const otpServer = document.getElementById('server-otp-hash').value;
+
+            // 1. Kiểm tra OTP trước
+            if(otpInput !== otpServer) {
+                Swal.fire('Sai mã OTP', 'Mã xác thực bạn nhập không đúng!', 'error');
+                return;
+            }
+
+            // 2. Lấy các thông tin khác
+            const fullname = document.getElementById('reg-fullname').value;
+            const u = document.getElementById('reg-user').value;
+            const e = document.getElementById('reg-email').value;
+            const ph = document.getElementById('reg-phone').value;
+            const p = document.getElementById('reg-pass').value;
+            const c = document.getElementById('reg-confirm').value;
+
+            if(!fullname || !ph || !p) { Swal.fire('Thiếu thông tin', 'Vui lòng điền đầy đủ!', 'warning'); return; }
+            if(p !== c) { Swal.fire('Lỗi', 'Mật khẩu xác nhận không khớp', 'error'); return; }
+
+            // 3. Gửi đăng ký hoàn tất
+            try {
+                const res = await fetch('/api/register/confirm', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        full_name: fullname, username: u, email: e, phone: ph, password: p, role: 'teacher'
+                    })
+                });
+                const data = await res.json();
+                
+                if(data.status === 'success') {
+                    Swal.fire('Thành công', 'Tài khoản đã được tạo! Hãy đăng nhập.', 'success')
+                    .then(() => window.location.href = '/');
+                } else {
+                    Swal.fire('Lỗi', data.message, 'error');
+                }
+            } catch(err) {
+                Swal.fire('Lỗi', 'Có lỗi xảy ra', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

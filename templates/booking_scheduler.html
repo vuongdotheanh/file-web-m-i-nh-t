@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Lịch Biểu Đặt Phòng - EduManager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* === CẤU HÌNH MÀU SẮC CHUẨN === */
+        :root {
+            --color-bar: #4361ee;       /* Xanh EduManager */
+            --color-confirm: #06d6a0;   
+            --color-back: #2b2d42;      
+            --color-cancel: #ef233c;    
+            --color-text-cancel: #fff;  
+        }
+
+        body, table { color: #2b2d42 !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* CONTAINER CHÍNH */
+        .scheduler-container { overflow-x: auto; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-top: 20px; position: relative; border: 1px solid #eee; }
+        .scheduler-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1200px; user-select: none; }
+        .scheduler-table th, .scheduler-table td { border-right: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; padding: 0; text-align: center; height: 55px; box-sizing: border-box; color: #000 !important; }
+        .scheduler-table th { background-color: #f8f9fa; color: var(--color-back) !important; font-weight: 800; position: sticky; top: 0; z-index: 10; padding: 10px 5px; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px; }
+        .room-name-col { background: #fff; font-weight: 700; text-align: left !important; padding: 0 20px !important; width: 220px; min-width: 220px; position: sticky; left: 0; z-index: 20; border-right: 2px solid #e0e0e0; box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+        
+        /* CÁC TRẠNG THÁI Ô */
+        .available-slot:hover { background-color: #eef2ff; cursor: cell; }
+        .booked-slot { background-color: #f9f9f9; cursor: not-allowed; background-image: repeating-linear-gradient(45deg, #f9f9f9, #f9f9f9 10px, #f0f0f0 10px, #f0f0f0 20px); }
+        .maintenance-slot { background-color: #fff8e1; cursor: not-allowed; background-image: repeating-linear-gradient(135deg, #fff8e1, #fff8e1 10px, #ffecb3 10px, #ffecb3 20px); opacity: 0.8; }
+
+        /* THANH BOOKING */
+        .booking-bar {
+            position: absolute; height: 40px; top: 7px;
+            background: linear-gradient(135deg, #4361ee, #3a0ca3);
+            color: white !important; font-size: 0.8rem; font-weight: 600;
+            display: flex; align-items: center; padding-left: 12px;
+            border-radius: 6px; box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
+            z-index: 15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            cursor: pointer; transition: all 0.2s; border: 1px solid rgba(255,255,255,0.2);
+            border-left: 4px solid #fff; 
+        }
+        .booking-bar:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 6px 15px rgba(67, 97, 238, 0.4); z-index: 25; }
+        
+        .drag-selection { position: absolute; background: rgba(67, 97, 238, 0.2); border: 2px dashed #4361ee; border-radius: 4px; pointer-events: none; z-index: 10; }
+        
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(43, 45, 66, 0.6); backdrop-filter: blur(4px); }
+        .modal-content { background-color: #fff; margin: 80px auto; padding: 30px; width: 420px; border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); animation: slideDown 0.3s ease; }
+        @keyframes slideDown { from {transform: translateY(-20px); opacity: 0;} to {transform: translateY(0); opacity: 1;} }
+        .close-btn { float: right; font-size: 24px; cursor: pointer; color: #ccc; transition: 0.2s; }
+        .close-btn:hover { color: var(--color-back); }
+        .btn-custom { border: none; padding: 12px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-custom:hover { opacity: 0.9; transform: translateY(-1px); }
+
+       
+        .sidebar nav ul li.active a {
+            background: rgba(67, 97, 238, 0.1); /* Giữ nền xanh nhạt */
+            color: var(--color-bar);            /* Chữ xanh đậm */
+            font-weight: 700;
+            
+            /* BỎ VIỀN TRÁI */
+            border-left: none; 
+            
+            /* Bo tròn đều 4 góc cho mềm mại */
+            border-radius: 10px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo" style="color: var(--color-bar);"><i class="fas fa-graduation-cap"></i><span>EduManager</span></div>
+            <nav>
+                <ul>
+                    <li><a href="/dashboard"><i class="fas fa-th-large"></i> Tổng quan</a></li>
+                    
+                    <li class="active"><a href="/booking-scheduler"><i class="fas fa-calendar-alt"></i> Lịch đặt phòng</a></li>
+                    
+                    <li><a href="/room-management"><i class="fas fa-door-open"></i> Quản lý phòng học</a></li>
+                    
+                    {% if role == 'admin' %}
+                    <li><a href="/user-management"><i class="fas fa-users-cog"></i> Quản lý người dùng</a></li>
+                    {% endif %}
+                    
+                    <li><a href="/profile"><i class="fas fa-user-circle"></i> Quản lý tài khoản</a></li>
+                    
+                    <li class="logout-item" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px;">
+                        <a href="/logout" style="color: #ef233c !important;"><i class="fas fa-sign-out-alt"></i> Đăng xuất</a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header>
+                <div style="visibility: hidden;"></div>
+                <div class="user-profile">
+                    <div class="info"><strong>{{ full_name if full_name else username }}</strong> ({{ role }})</div>
+                    <img src="https://ui-avatars.com/api/?name={{ full_name if full_name else username }}&background=4361ee&color=fff&size=128" alt="Avatar">
+                </div>
+            </header>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background: #fff; padding: 15px 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <a href="/room-management" class="btn-custom" style="background-color: var(--color-bar); color: white; text-decoration: none;">
+                        <i class="fas fa-arrow-left"></i> Quay lại
+                    </a>
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-size: 0.8rem; color: #888; font-weight: 600;">CHỌN NGÀY XEM:</span>
+                        <input type="date" id="scheduleDate" style="border: none; font-weight: 700; font-size: 1.1rem; color: var(--color-back); outline: none; background: transparent; cursor: pointer;">
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 15px; font-size: 0.85rem; font-weight: 600;">
+                    <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 12px; background: var(--color-bar); border-radius: 3px;"></span> Đã đặt</span>
+                    <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 12px; background: #fff; border: 1px solid #ccc; border-radius: 3px;"></span> Trống</span>
+                    <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 12px; background: #fff8e1; border: 1px solid #ffecb3; border-radius: 3px;"></span> Bảo trì</span>
+                </div>
+            </div>
+
+            <div class="scheduler-container">
+                <table class="scheduler-table">
+                    <thead><tr id="timeHeader"><th class="room-name-col">DANH SÁCH PHÒNG</th></tr></thead>
+                    <tbody id="scheduleBody"></tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('bookingModal')">&times;</span>
+            <h2 style="margin-top:0; color: var(--color-confirm); display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-check-circle"></i> Xác nhận đặt phòng
+            </h2>
+            <div style="background: #f0fff9; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #ccfbf1;">
+                <p style="margin: 8px 0; font-size: 1.1rem;"><strong>Phòng:</strong> <span id="modalRoomName" style="color: var(--color-back);"></span></p>
+                <div style="display: flex; gap: 20px; margin-top: 10px;">
+                    <div><small style="color: #666;">BẮT ĐẦU</small><br><strong id="modalStartTime" style="font-size: 1.2rem;"></strong></div>
+                    <div><small style="color: #666;">THỜI LƯỢNG</small><br><strong id="modalDuration" style="font-size: 1.2rem; color: var(--color-bar);"></strong></div>
+                </div>
+            </div>
+            <form id="bookingForm">
+                <input type="hidden" name="room_id" id="modalRoomId">
+                <input type="hidden" name="start_time" id="modalStartISO">
+                <input type="hidden" name="duration_display" id="modalDurationVal">
+                <button type="submit" class="btn-custom" style="width:100%; background-color: var(--color-confirm); color: white; font-size: 16px; box-shadow: 0 4px 10px rgba(6, 214, 160, 0.4);">Xác nhận Đặt ngay</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="cancelModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('cancelModal')">&times;</span>
+            <h2 style="margin-top:0; color: var(--color-back);">Chi tiết Lịch Đặt</h2>
+            <div style="background: #fff8e1; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-left: 5px solid var(--color-cancel);">
+                <p><strong>Người đặt:</strong> <span id="cancelBooker" style="font-size: 1.1rem;"></span></p>
+                <p><strong>Phòng:</strong> <span id="cancelRoomName"></span></p>
+                <p><strong>Thời gian:</strong> <span id="cancelTime" style="font-family: monospace; font-weight: 700;"></span></p>
+            </div>
+            <p style="text-align: center; color: #666; margin-bottom: 20px;">Bạn có muốn hủy bỏ lịch đặt này không?</p>
+            <input type="hidden" id="cancelBookingId">
+            <div style="display: flex; gap: 15px;">
+                <button onclick="confirmCancel()" class="btn-custom" style="background-color: var(--color-cancel); color: var(--color-text-cancel); flex: 1; box-shadow: 0 4px 10px rgba(255, 87, 87, 0.4);"><i class="fas fa-trash-alt"></i> Hủy Lịch</button>
+                <button onclick="closeModal('cancelModal')" class="btn-custom" style="background-color: #e9ecef; color: #495057; flex: 1;">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const START_HOUR = 7;
+        const END_HOUR = 22; 
+        const classrooms = {{ classrooms | tojson | safe }};
+        const rawBookings = {{ bookings | tojson | safe }};
+        
+        document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
+
+        const bookings = rawBookings.map(b => {
+            try {
+                const start = new Date(b.start_time);
+                let dur = 1;
+                if (b.duration_hours) {
+                    const parts = b.duration_hours.toString().match(/(\d+)\s*(Giờ|Phút)/g);
+                    if(parts) {
+                        dur = 0;
+                        parts.forEach(p => {
+                            const m = p.match(/(\d+)\s*(Giờ|Phút)/);
+                            if(m) dur += m[2]==='Giờ' ? parseInt(m[1]) : parseInt(m[1])/60;
+                        });
+                    } else dur = parseFloat(b.duration_hours) || 1;
+                }
+                return { ...b, startTime: start, endTime: new Date(start.getTime() + dur*3600000), duration: dur, date: start.toISOString().split('T')[0] };
+            } catch (e) { return null; }
+        }).filter(b => b !== null);
+
+        function initScheduler() {
+            const header = document.getElementById('timeHeader');
+            header.innerHTML = '<th class="room-name-col">DANH SÁCH PHÒNG</th>';
+            for(let h=START_HOUR; h<END_HOUR; h++) {
+                header.innerHTML += `<th>${h}:00</th><th>${h}:30</th>`;
+            }
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('scheduleBody');
+            const selectedDate = document.getElementById('scheduleDate').value;
+            tbody.innerHTML = "";
+
+            if (classrooms.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="32" style="text-align: center; padding: 40px; color: #888;">Chưa có phòng học nào.</td></tr>`;
+                return;
+            }
+
+            classrooms.forEach(room => {
+                const isMaintenance = room.status === 'Maintenance';
+                const statusHtml = isMaintenance 
+                    ? `<br><span style="color:#d35400; font-weight:bold; font-size:0.7rem;">⚠️ ĐANG BẢO TRÌ</span>` 
+                    : `<br><span style="font-size: 0.75rem; color:#888; font-weight: 500;">${room.capacity} chỗ</span>`;
+
+                let row = `<tr><td class="room-name-col">${room.room_name}${statusHtml}</td>`;
+                
+                for(let h=START_HOUR; h<END_HOUR; h++) {
+                    for(let m=0; m<60; m+=30) {
+                        if (isMaintenance) {
+                            row += `<td class="maintenance-slot" title="Phòng đang bảo trì"></td>`;
+                        } else {
+                            let slotTime = new Date(`${selectedDate}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+                            let isBooked = bookings.find(b => b.room_id == room.id && b.date === selectedDate && slotTime >= b.startTime && slotTime < b.endTime);
+                            
+                            if(isBooked) {
+                                row += `<td class="booked-slot"></td>`;
+                            } else {
+                                row += `<td class="available-slot" data-room-id="${room.id}" data-room-name="${room.room_name}" data-time="${slotTime.toISOString()}"></td>`;
+                            }
+                        }
+                    }
+                }
+                row += "</tr>";
+                tbody.innerHTML += row;
+            });
+            drawBookingBars(selectedDate);
+            setupDragDrop();
+        }
+
+        function drawBookingBars(date) {
+            document.querySelectorAll('.booking-bar').forEach(b => b.remove());
+            const container = document.querySelector('.scheduler-container');
+            const rows = document.querySelectorAll('#scheduleBody tr');
+
+            requestAnimationFrame(() => {
+                bookings.forEach(b => {
+                    if(b.date !== date) return;
+                    const roomIndex = classrooms.findIndex(r => r.id == b.room_id);
+                    if(roomIndex === -1) return;
+                    
+                    const targetRow = rows[roomIndex];
+                    const startHourIndex = (b.startTime.getHours() - START_HOUR) * 2 + (b.startTime.getMinutes() / 30);
+                    const cellIndex = startHourIndex + 1; 
+                    
+                    if(targetRow && targetRow.children[cellIndex]) {
+                        const targetCell = targetRow.children[cellIndex];
+                        const bar = document.createElement('div');
+                        bar.className = 'booking-bar';
+                        bar.style.width = (targetCell.offsetWidth * b.duration * 2 - 4) + 'px'; 
+                        bar.style.left = (targetCell.offsetLeft + 2) + 'px';
+                        bar.style.top = (targetCell.offsetTop + 7) + 'px';
+                        bar.innerHTML = `<i class="fas fa-user-circle" style="margin-right:5px; opacity:0.8;"></i> ${b.booker_name}`;
+                        bar.onclick = (e) => { e.stopPropagation(); showCancelModal(b); };
+                        container.appendChild(bar);
+                    }
+                });
+            });
+        }
+
+        function showCancelModal(booking) {
+            const room = classrooms.find(r => r.id == booking.room_id);
+            document.getElementById('cancelBooker').innerText = booking.booker_name;
+            document.getElementById('cancelRoomName').innerText = room ? room.room_name : 'Unknown';
+            document.getElementById('cancelTime').innerText = `${booking.startTime.toLocaleTimeString().slice(0,5)} (${booking.duration_hours})`;
+            document.getElementById('cancelBookingId').value = booking.id;
+            document.getElementById('cancelModal').style.display = 'block';
+        }
+
+        async function confirmCancel() {
+            const bookingId = document.getElementById('cancelBookingId').value;
+            const res = await fetch('/api/bookings/delete', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ booking_id: bookingId })
+            });
+            const result = await res.json();
+            if(result.status === 'success') {
+                Swal.fire('Đã hủy!', 'Lịch đặt đã được xóa.', 'success').then(() => window.location.reload());
+            } else {
+                Swal.fire('Lỗi!', result.message, 'error');
+            }
+        }
+
+        function setupDragDrop() {
+            let isDragging = false;
+            let startCell = null;
+            let selectionDiv = null;
+            const container = document.querySelector('.scheduler-container');
+
+            container.onmousedown = (e) => {
+                if (e.target.classList.contains('available-slot')) {
+                    isDragging = true;
+                    startCell = e.target;
+                    selectionDiv = document.createElement('div');
+                    selectionDiv.className = 'drag-selection';
+                    selectionDiv.style.pointerEvents = 'none'; 
+                    document.body.appendChild(selectionDiv);
+                    updateSelection(startCell, startCell);
+                    e.preventDefault();
+                }
+            };
+
+            document.onmousemove = (e) => {
+                if (!isDragging || !startCell) return;
+                let elem = document.elementFromPoint(e.clientX, e.clientY);
+                if (elem && elem.classList.contains('available-slot') && elem.dataset.roomId === startCell.dataset.roomId) {
+                    updateSelection(startCell, elem);
+                }
+            };
+
+            window.onmouseup = (e) => {
+                if (!isDragging) return; 
+                isDragging = false; 
+                let endCell = document.elementFromPoint(e.clientX, e.clientY);
+                if (endCell && endCell.classList.contains('available-slot') && startCell && endCell.dataset.roomId === startCell.dataset.roomId) {
+                    openBookingModal(startCell, endCell);
+                }
+                if (selectionDiv) { selectionDiv.remove(); selectionDiv = null; }
+                startCell = null;
+            };
+
+            function updateSelection(c1, c2) {
+                let r1 = c1.getBoundingClientRect();
+                let r2 = c2.getBoundingClientRect();
+                let left = Math.min(r1.left, r2.left);
+                let top = r1.top; 
+                let width = Math.abs(r1.left - r2.left) + r1.width;
+                let height = r1.height;
+                selectionDiv.style.left = (left + window.scrollX) + 'px';
+                selectionDiv.style.top = (top + window.scrollY) + 'px';
+                selectionDiv.style.width = width + 'px';
+                selectionDiv.style.height = height + 'px';
+            }
+        }
+        function openBookingModal(c1, c2) {
+            let t1 = new Date(c1.dataset.time);
+            let t2 = new Date(c2.dataset.time);
+            let start = t1 < t2 ? t1 : t2;
+            let duration = ((Math.abs(t1 - t2) / 1800000) + 1) * 0.5;
+            
+            document.getElementById('modalRoomName').innerText = c1.dataset.roomName;
+            document.getElementById('modalStartTime').innerText = start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            let durText = Number.isInteger(duration) ? duration + " Giờ" : Math.floor(duration) + " Giờ 30 Phút";
+            if (Math.floor(duration) === 0) durText = "30 Phút";
+            
+            document.getElementById('modalDuration').innerText = durText;
+            document.getElementById('modalRoomId').value = c1.dataset.roomId;
+            document.getElementById('modalStartISO').value = (t1 < t2 ? c1.dataset.time : c2.dataset.time);
+            document.getElementById('modalDurationVal').value = durText;
+            document.getElementById('bookingModal').style.display = 'block';
+        }
+
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        document.getElementById('bookingForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target).entries());
+            data.room_id = parseInt(data.room_id);
+            let res = await fetch('/api/bookings/create', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            const result = await res.json();
+            if(result.status === 'success') {
+                closeModal('bookingModal');
+                Swal.fire({ title: 'Đặt thành công!', text: 'Lịch đặt đã được ghi nhận.', icon: 'success', confirmButtonColor: '#06d6a0' }).then(() => window.location.reload());
+            } else {
+                Swal.fire('Lỗi!', result.message, 'error');
+            }
+        };
+
+        document.getElementById('scheduleDate').addEventListener('change', renderTable);
+        initScheduler();
+    </script>
+</body>
+</html>

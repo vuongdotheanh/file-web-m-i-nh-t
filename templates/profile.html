@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản lý tài khoản - EduManager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .profile-wrapper { display: flex; gap: 30px; flex-wrap: wrap; }
+        
+        /* Cột bên trái: Form sửa thông tin */
+        .profile-card { flex: 1; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); min-width: 300px; height: fit-content; }
+        
+        /* Cột bên phải: Lịch sử */
+        .history-card { flex: 1.5; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); min-width: 300px; }
+
+        h2 { margin-top: 0; color: #4361ee; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 20px; font-size: 1.2rem; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #2b2d42; font-size: 0.9rem; }
+        .form-group input { width: 100%; padding: 12px; border: 2px solid #f0f0f0; border-radius: 10px; font-size: 14px; box-sizing: border-box; transition: 0.3s; }
+        .form-group input:focus { border-color: #4361ee; outline: none; }
+        .form-group input:disabled { background: #f9f9f9; color: #888; border-color: #eee; }
+        
+        .role-tag { display: inline-block; background: #e0e7ff; color: #4361ee; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; text-transform: uppercase; }
+        
+        .btn-save { width: 100%; padding: 12px; background: #4361ee; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3); margin-top: 10px; }
+        .btn-save:hover { background: #3a0ca3; transform: translateY(-2px); }
+
+        /* Bảng lịch sử */
+        .history-table { width: 100%; border-collapse: collapse; }
+        .history-table th { text-align: left; color: #888; font-size: 0.85rem; padding: 10px; border-bottom: 1px solid #eee; }
+        .history-table td { padding: 15px 10px; border-bottom: 1px solid #f9f9f9; font-size: 0.95rem; }
+        .history-icon { width: 30px; height: 30px; background: #e6fffa; color: #06d6a0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-right: 10px; }
+        
+        .empty-history { text-align: center; color: #999; padding: 40px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo"><i class="fas fa-graduation-cap"></i><span>EduManager</span></div>
+            <nav>
+                <ul>
+                    <li><a href="/dashboard"><i class="fas fa-th-large"></i> Tổng quan</a></li>
+                    {% if role == 'admin' or role == 'teacher' %}
+                    <li><a href="/booking-scheduler"><i class="fas fa-calendar-alt"></i> Lịch đặt phòng</a></li>
+                    <li><a href="/room-management"><i class="fas fa-door-open"></i> Quản lý phòng học</a></li>
+                    {% endif %}
+                    {% if role == 'admin' %}
+                    <li><a href="/user-management"><i class="fas fa-user-shield"></i> Quản lý người dùng</a></li>
+                    {% endif %}
+                    <li><a href="/profile" class="active" style="background: rgba(67, 97, 238, 0.1); color: #4361ee; font-weight: 700;"><i class="fas fa-user-circle"></i> Quản lý tài khoản</a></li>
+                    <li class="logout-item"><a href="/logout" style="color: #ef233c;"><i class="fas fa-sign-out-alt"></i> Đăng xuất</a></li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header>
+                <div class="search-bar"><i class="fas fa-search"></i><input type="text" placeholder="Tìm kiếm..."></div>
+                <div class="user-profile">
+                    <div class="info"><strong>{{ full_name if full_name else username }}</strong> ({{ role }})</div>
+                    
+                    <img src="https://ui-avatars.com/api/?name={{ full_name if full_name else username }}&background=4361ee&color=fff&size=128" alt="Avatar">
+                </div>
+            </header>
+
+            <div class="profile-wrapper">
+                <div class="profile-card">
+                    <h2><i class="fas fa-id-card"></i> Thông tin cá nhân</h2>
+                    <form id="profileForm">
+                        <div class="form-group">
+                            <label>Tên đăng nhập <span class="role-tag">{{ role }}</span></label>
+                            <input type="text" value="{{ user.username }}" disabled>
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-envelope"></i> Email</label>
+                            <input type="email" name="email" value="{{ user.email if user.email != 'None' else '' }}" required placeholder="Nhập email của bạn...">
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-phone"></i> Số điện thoại</label>
+                            <input type="text" name="phone" value="{{ user.phone if user.phone != 'None' else '' }}" placeholder="Nhập số điện thoại...">
+                        </div>
+
+                        <hr style="margin: 30px 0; border:0; border-top: 1px solid #eee;">
+
+<h3 style="color: #2b2d42; font-size: 1rem; margin-bottom: 15px;"><i class="fas fa-lock"></i> Bảo mật</h3>
+
+<div style="background: #f8f9fa; padding: 20px; border-radius: 12px; border: 1px solid #eee;">
+    <div id="pass-step-1">
+        <p style="font-size: 0.9rem; color: #666; margin-bottom: 10px;">Để đổi mật khẩu, chúng tôi cần xác minh qua Email của bạn.</p>
+        <button type="button" onclick="requestChangePass()" class="btn-premium btn-red" style="width: 100%; justify-content: center; padding: 10px; border: none; border-radius: 8px; background: #ef233c; color: white; cursor: pointer;">
+            <i class="fas fa-envelope"></i> Gửi mã xác thực để đổi mật khẩu
+        </button>
+    </div>
+
+    <div id="pass-step-2" style="display: none;">
+        <div class="form-group">
+            <label style="color: #ef233c;">Nhập mã OTP (Đã gửi về Email)</label>
+            <input type="text" id="profile-otp" placeholder="Nhập 6 số..." style="text-align: center; font-weight: bold;">
+        </div>
+        <div class="form-group">
+            <label>Mật khẩu mới</label>
+            <input type="password" id="profile-new-pass" placeholder="Nhập mật khẩu mới...">
+        </div>
+        <button type="button" onclick="confirmChangePass()" class="btn-save" style="background: #ef233c;">Xác nhận đổi ngay</button>
+    </div>
+</div>
+
+                        <button type="submit" class="btn-save">Cập nhật thông tin</button>
+                    </form>
+                </div>
+
+                <div class="history-card">
+                    <h2><i class="fas fa-history"></i> Lịch sử đặt phòng</h2>
+                    
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Phòng</th>
+                                <th>Thời gian bắt đầu</th>
+                                <th>Thời lượng</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in history %}
+                            <tr>
+                                <td>
+                                    <div style="display: flex; align-items: center;">
+                                        <div class="history-icon"><i class="fas fa-door-open"></i></div>
+                                        <strong>{{ item.room_name }}</strong>
+                                    </div>
+                                </td>
+                                <td>{{ item.start_time.split('T')[0] }} <span style="color:#888; font-size:0.8rem;">{{ item.start_time.split('T')[1][:5] }}</span></td>
+                                <td>{{ item.duration }}</td>
+                                <td><span style="color: #06d6a0; font-weight: bold; font-size: 0.85rem;">{{ item.status }}</span></td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4">
+                                    <div class="empty-history">
+                                        <i class="fas fa-box-open" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                                        <p>Bạn chưa có lịch đặt phòng nào.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.getElementById('profileForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target).entries());
+            
+            const res = await fetch('/api/profile/update', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            
+            if (result.status === 'success') {
+                Swal.fire({ title: 'Thành công!', text: result.message, icon: 'success', confirmButtonColor: '#4361ee' }).then(() => window.location.reload());
+            } else {
+                Swal.fire('Lỗi!', result.message, 'error');
+            }
+        };
+    </script>
+    <script>
+    async function requestChangePass() {
+        const btn = document.querySelector('#pass-step-1 button');
+        btn.innerHTML = 'Đang gửi...'; btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/profile/send-otp', {method: 'POST'});
+            const data = await res.json();
+
+            if(data.status === 'success') {
+                Swal.fire('Đã gửi mã!', 'Vui lòng kiểm tra email để lấy mã OTP.', 'success');
+                document.getElementById('pass-step-1').style.display = 'none';
+                document.getElementById('pass-step-2').style.display = 'block';
+            } else {
+                Swal.fire('Lỗi', data.message, 'error');
+                btn.innerHTML = '<i class="fas fa-envelope"></i> Gửi mã xác thực để đổi mật khẩu';
+                btn.disabled = false;
+            }
+        } catch (e) {
+            Swal.fire('Lỗi', 'Không thể kết nối đến server', 'error');
+            btn.disabled = false;
+        }
+    }
+
+    async function confirmChangePass() {
+        const otp = document.getElementById('profile-otp').value;
+        const np = document.getElementById('profile-new-pass').value;
+
+        if(!otp || !np) { Swal.fire('Lỗi', 'Vui lòng nhập đủ thông tin!', 'warning'); return; }
+
+        try {
+            const res = await fetch('/api/profile/change-password', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({otp: otp, new_password: np})
+            });
+            const data = await res.json();
+
+            if(data.status === 'success') {
+                Swal.fire('Thành công', 'Mật khẩu đã được cập nhật!', 'success')
+                .then(() => window.location.reload());
+            } else {
+                Swal.fire('Thất bại', data.message, 'error');
+            }
+        } catch (e) {
+            Swal.fire('Lỗi', 'Lỗi kết nối', 'error');
+        }
+    }
+</script>
+<script>
+        // Lưu lại giá trị ban đầu để so sánh
+        // (Lưu ý: Dùng dấu nháy đơn bao quanh giá trị template để tránh lỗi cú pháp)
+        const initialEmail = '{{ user.email if user.email != "None" else "" }}';
+        const initialPhone = '{{ user.phone if user.phone != "None" else "" }}';
+
+        document.getElementById('profileForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            // 1. Kiểm tra xem người dùng có sửa Email hoặc SĐT không
+            const isChanged = (data.email !== initialEmail || data.phone !== initialPhone);
+
+            if (isChanged) {
+                // Nếu có thay đổi -> Hỏi xác nhận gửi OTP
+                const confirm = await Swal.fire({
+                    title: 'Xác thực bảo mật',
+                    text: 'Bạn đang thay đổi Email hoặc Số điện thoại. Chúng tôi cần gửi mã OTP về Email hiện tại để xác minh danh tính.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#4361ee',
+                    confirmButtonText: 'Gửi mã & Tiếp tục',
+                    cancelButtonText: 'Hủy bỏ'
+                });
+
+                if (!confirm.isConfirmed) return; // Nếu hủy thì dừng lại
+
+                // Gửi yêu cầu lấy mã OTP
+                Swal.showLoading();
+                try {
+                    const resOtp = await fetch('/api/profile/send-otp', {method: 'POST'});
+                    const dataOtp = await resOtp.json();
+                    
+                    if (dataOtp.status !== 'success') {
+                        Swal.fire('Lỗi', dataOtp.message, 'error');
+                        return;
+                    }
+
+                    // Hiện ô nhập mã OTP
+                    const { value: otp } = await Swal.fire({
+                        title: 'Nhập mã xác thực',
+                        input: 'text',
+                        inputLabel: 'Mã 6 số đã được gửi về Email của bạn',
+                        inputPlaceholder: 'Nhập mã...',
+                        confirmButtonText: 'Xác nhận cập nhật',
+                        showCancelButton: true,
+                        inputValidator: (value) => {
+                            if (!value) return 'Bạn cần nhập mã OTP!'
+                        }
+                    });
+
+                    if (!otp) return; // Nếu không nhập gì thì dừng
+
+                    // Thêm mã OTP vào dữ liệu để gửi đi
+                    data.otp = otp;
+
+                } catch (err) {
+                    Swal.fire('Lỗi', 'Không thể kết nối đến server', 'error');
+                    return;
+                }
+            }
+
+            // 2. Gửi dữ liệu cập nhật lên Server (Có kèm OTP nếu đã nhập)
+            const res = await fetch('/api/profile/update', {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            
+            if (result.status === 'success') {
+                Swal.fire({ 
+                    title: 'Thành công!', 
+                    text: result.message, 
+                    icon: 'success', 
+                    confirmButtonColor: '#4361ee' 
+                }).then(() => window.location.reload());
+            } else if (result.status === 'require_otp') {
+                Swal.fire('Cần xác thực', 'Hệ thống yêu cầu mã OTP cho thay đổi này.', 'warning');
+            } else {
+                Swal.fire('Lỗi!', result.message, 'error');
+            }
+        };
+        
+        // ... (Giữ nguyên các function đổi mật khẩu khác ở dưới nếu có) ...
+    </script>
+</body>
+</html>

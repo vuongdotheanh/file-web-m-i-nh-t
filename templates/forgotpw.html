@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Quên mật khẩu - EduManager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body.login-page {
+            display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9effd 100%);
+        }
+        .step-2 { display: none; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)} }
+    </style>
+</head>
+<body class="login-page">
+    <div class="login-card">
+        <div class="login-header">
+            <div class="logo"><i class="fas fa-key"></i> <span>EduManager</span></div>
+            <h2>Khôi Phục Mật Khẩu</h2>
+            <p>Xác thực qua Email đã đăng ký</p>
+        </div>
+        
+        <div class="login-form">
+            <div class="form-group">
+                <label>Tên đăng nhập</label>
+                <input type="text" id="reset-user" placeholder="Nhập username của bạn...">
+            </div>
+
+            <button id="btn-get-code" onclick="sendOTP()" class="btn-login" style="background: #2b2d42;">
+                <i class="fas fa-paper-plane"></i> Lấy Mã Xác Thực
+            </button>
+
+            <div id="step-2-area" class="step-2">
+                <hr style="margin: 20px 0; border: 0; border-top: 1px dashed #ccc;">
+                
+                <div class="form-group">
+                    <label style="color: #ef233c;">Mã xác thực (Check Email)</label>
+                    <input type="text" id="otp-input" placeholder="Nhập 6 số mã OTP..." style="text-align: center; letter-spacing: 2px; font-weight: bold;">
+                </div>
+
+                <div class="form-group">
+                    <label>Mật khẩu mới</label>
+                    <input type="password" id="new-pass" placeholder="Nhập mật khẩu mới...">
+                </div>
+
+                <button onclick="confirmReset()" class="btn-login">Đổi Mật Khẩu Ngay</button>
+            </div>
+        </div>
+        
+        <div class="login-footer">
+            <p><a href="/">Quay lại Đăng nhập</a></p>
+        </div>
+    </div>
+
+    <script>
+        async function sendOTP() {
+            const u = document.getElementById('reset-user').value;
+            if(!u) { Swal.fire('Lỗi', 'Vui lòng nhập tên đăng nhập trước!', 'warning'); return; }
+
+            // Hiệu ứng loading
+            const btn = document.getElementById('btn-get-code');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang gửi...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/forgot/send-otp', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: u})
+                });
+                const data = await res.json();
+
+                if(data.status === 'success') {
+                    Swal.fire('Đã gửi mã!', data.message, 'success');
+                    document.getElementById('step-2-area').style.display = 'block'; // Hiện bước 2
+                    document.getElementById('reset-user').disabled = true; // Khóa ô user
+                    btn.style.display = 'none'; // Ẩn nút gửi đi
+                } else {
+                    Swal.fire('Lỗi', data.message, 'error');
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Lấy Mã Xác Thực';
+                    btn.disabled = false;
+                }
+            } catch(e) { Swal.fire('Lỗi kết nối', 'Không thể gửi mail.', 'error'); }
+        }
+
+        async function confirmReset() {
+            const u = document.getElementById('reset-user').value;
+            const otp = document.getElementById('otp-input').value;
+            const np = document.getElementById('new-pass').value;
+
+            if(!otp || !np) { Swal.fire('Thiếu thông tin', 'Vui lòng nhập Mã OTP và Mật khẩu mới!', 'warning'); return; }
+
+            const res = await fetch('/api/forgot/reset', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, otp: otp, new_password: np})
+            });
+            const data = await res.json();
+
+            if(data.status === 'success') {
+                Swal.fire('Thành công', 'Mật khẩu đã được đổi. Hãy đăng nhập lại.', 'success')
+                .then(() => window.location.href = '/');
+            } else {
+                Swal.fire('Thất bại', data.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

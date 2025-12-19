@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Xác thực tài khoản</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
+        .card { background: white; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 400px; }
+        input { font-size: 24px; text-align: center; letter-spacing: 5px; width: 100%; padding: 15px; margin: 20px 0; border: 2px solid #eee; border-radius: 10px; }
+        button { width: 100%; padding: 15px; background: #4361ee; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2 style="color: #4361ee;">Nhập Mã Xác Thực</h2>
+        <p>Chúng tôi đã gửi mã 6 số đến Email của bạn.</p>
+        
+        <input type="text" id="otp-input" placeholder="000000" maxlength="6">
+        <button onclick="verifyOTP()">XÁC NHẬN</button>
+    </div>
+
+    <script>
+        // Lấy username từ URL (do trang đăng ký chuyển sang)
+        const urlParams = new URLSearchParams(window.location.search);
+        const username = urlParams.get('user');
+
+        async function verifyOTP() {
+            const otp = document.getElementById('otp-input').value;
+            
+            const res = await fetch('/api/verify-otp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username: username, otp: otp })
+            });
+
+            const data = await res.json();
+            
+            if(data.status === 'success') {
+                Swal.fire('Thành công', 'Tài khoản đã được kích hoạt!', 'success')
+                .then(() => window.location.href = '/'); // Về trang đăng nhập
+            } else {
+                Swal.fire('Lỗi', data.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

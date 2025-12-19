@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập - EduManager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="login-page">
+    <div class="login-card">
+        <div class="login-header">
+            <div class="logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>EduManager</span>
+            </div>
+            <h1>Chào mừng trở lại!</h1>
+            <p>Vui lòng đăng nhập để vào hệ thống</p>
+        </div>
+
+        <div class="login-form">
+            <div class="form-group">
+                <label for="username"><i class="fas fa-user"></i> Tên đăng nhập</label>
+                <input type="text" id="username" placeholder="Nhập tài khoản..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> Mật khẩu</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+
+            <button onclick="handleLogin()" class="btn-login">
+                <span>Đăng Nhập</span>
+                <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+
+        <div class="login-footer">
+            <div class="footer-links">
+                <a href="/forgot-password">Quên mật khẩu?</a>
+                <span class="divider">|</span>
+                <a href="/register">Đăng kí</a>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        async function handleLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            
+            if (!u || !p) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Thiếu thông tin',
+                    text: 'Vui lòng điền đầy đủ tên đăng nhập và mật khẩu!',
+                    confirmButtonColor: '#4361ee'
+                });
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: u, password: p})
+                });
+                
+                const data = await res.json();
+                if(data.status === "success") {
+                    // Thông báo thành công đẹp mắt rồi mới chuyển trang
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Đăng nhập thành công!',
+                        text: 'Đang chuyển hướng vào hệ thống...',
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.href = "/dashboard";
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Đăng nhập thất bại',
+                        text: data.message || "Sai tài khoản hoặc mật khẩu!",
+                        confirmButtonColor: '#ef233c'
+                    });
+                }
+            } catch (error) {
+                console.error("Lỗi kết nối:", error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Lỗi kết nối',
+                    text: "Không thể kết nối đến máy chủ!",
+                    confirmButtonColor: '#ef233c'
+                });
+            }
+        }
+
+        document.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') handleLogin();
+        });
+    </script>
+</body>
+</html>

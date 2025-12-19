@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản Lý Phòng Học - EduManager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root { --primary: #4361ee; --success: #06d6a0; --warning: #ff9f1c; --danger: #ef233c; --dark: #4e59d5ff; }
+        
+        /* Badges */
+        .status-badge { padding: 6px 12px; border-radius: 30px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; text-transform: uppercase; }
+        .status-badge.available { background: rgba(6, 214, 160, 0.1); color: var(--success); border: 1px solid rgba(6, 214, 160, 0.2); }
+        .status-badge.maintenance { background: rgba(255, 159, 28, 0.1); color: var(--warning); border: 1px solid rgba(255, 159, 28, 0.2); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .available .dot { background: var(--success); box-shadow: 0 0 0 2px rgba(6, 214, 160, 0.3); }
+        .maintenance .dot { background: var(--warning); box-shadow: 0 0 0 2px rgba(255, 159, 28, 0.3); }
+
+        /* Buttons Premium */
+        .btn-premium { border: none; padding: 10px 18px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); font-size: 0.9rem; }
+        .btn-premium:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(8, 9, 9, 0.15); }
+        .btn-blue { background: linear-gradient(135deg, #4361ee, #3a0ca3); color: white; }
+        .btn-purple { background: linear-gradient(135deg, #7209b7, #560bad); color: white; }
+        .btn-white { background: white; color: var(--dark); border: 1px solid #eee; }
+        .btn-yellow { background: linear-gradient(135deg, #ffd166, #ffb703); color: #333; }
+        .btn-red { background: linear-gradient(135deg, #ef233c, #d90429); color: white; }
+        .btn-disabled { background: #e0e0e0; color: #999; cursor: not-allowed; box-shadow: none; }
+
+        /* --- BỘ LỌC (MỚI) --- */
+        .filter-group { display: flex; gap: 10px; background: #f1f3f9; padding: 5px; border-radius: 12px; }
+        .filter-btn { border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: 0.2s; color: #666; background: transparent; }
+        .filter-btn:hover { color: var(--primary); background: rgba(255,255,255,0.5); }
+        .filter-btn.active { background: white; color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+        /* Modal */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(43, 45, 66, 0.6); backdrop-filter: blur(4px); }
+        .modal-content { background: white; margin: 8% auto; padding: 30px; border-radius: 20px; width: 450px; box-shadow: 0 25px 50px rgba(0,0,0,0.25); }
+        .modal-content input, .modal-content select { width: 100%; padding: 12px; margin: 8px 0 20px; border: 2px solid #f0f0f0; border-radius: 10px; font-size: 15px; box-sizing: border-box; }
+        .submit-btn { width: 100%; padding: 14px; background: var(--success); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo" style="color: var(--color-bar);"><i class="fas fa-graduation-cap"></i><span>EduManager</span></div>
+            <nav>
+                <ul>
+                    <li><a href="/dashboard"><i class="fas fa-th-large"></i> Tổng quan</a></li>
+                    
+                    <li><a href="/booking-scheduler"><i class="fas fa-calendar-alt"></i> Lịch đặt phòng</a></li>
+                    
+                    <li class="active"><a href="/room-management"><i class="fas fa-door-open"></i> Quản lý phòng học</a></li>
+                    
+                    {% if role == 'admin' %}
+                    <li><a href="/user-management"><i class="fas fa-users-cog"></i> Quản lý người dùng</a></li>
+                    {% endif %}
+                    
+                    <li><a href="/profile"><i class="fas fa-user-circle"></i> Quản lý tài khoản</a></li>
+                    
+                    <li class="logout-item" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px;">
+                        <a href="/logout" style="color: #ef233c !important;"><i class="fas fa-sign-out-alt"></i> Đăng xuất</a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header>
+                <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="searchInput" onkeyup="searchRooms()" placeholder="Tìm theo tên phòng, thiết bị..."></div>
+                <div class="user-profile">
+                    <div class="info"><strong>{{ full_name if full_name else username }}</strong> ({{ role }})</div>
+                    
+                    <img src="https://ui-avatars.com/api/?name={{ full_name if full_name else username }}&background=4361ee&color=fff&size=128" alt="Avatar">
+                </div>
+            </header>
+
+            <section class="data-section">
+                <div class="section-header" style="justify-content: space-between; display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <h2 style="margin:0;">Phòng học</h2>
+                        
+                        <div class="filter-group">
+                            <button class="filter-btn active" onclick="filterStatus('all', this)">Tất cả</button>
+                            <button class="filter-btn" onclick="filterStatus('Available', this)">Hoạt động</button>
+                            <button class="filter-btn" onclick="filterStatus('Maintenance', this)">Bảo trì</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-premium btn-purple" onclick="window.location.href='/booking-scheduler'"><i class="fas fa-calendar-week"></i> Xem Lịch Tổng</button>
+                        {% if role == 'admin' %}
+                        <button class="btn-premium btn-blue" onclick="showCreateRoomModal()"><i class="fas fa-plus"></i> Thêm phòng</button>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table id="roomTable">
+                        <thead><tr><th>ID</th><th>Tên phòng</th><th>Sức chứa</th><th>Thiết bị</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
+                        <tbody>
+                            {% for room in classrooms %}
+                            <tr class="room-row" data-status="{{ room.status }}">
+                                <td><strong>#{{ room.id }}</strong></td>
+                                <td><span style="font-size: 1.05rem; font-weight: 700; color: var(--dark);">{{ room.room_name }}</span></td>
+                                <td>{{ room.capacity }}</td>
+                                <td>{{ room.equipment }}</td>
+                                <td>
+                                    {% if room.status == 'Maintenance' %}
+                                        <span class="status-badge maintenance"><span class="dot"></span> Bảo trì</span>
+                                    {% else %}
+                                        <span class="status-badge available"><span class="dot"></span> Hoạt động</span>
+                                    {% endif %}
+                                </td>
+                                <td class="actions">
+                                    <button class="btn-premium btn-white" style="padding: 6px 12px; font-size: 0.8rem;" onclick="toggleDetails(this, {{ room.id }})">Chi tiết</button>
+                                </td>
+                            </tr>
+                            
+                            <tr id="details-row-{{ room.id }}" class="room-details-row" style="display: none; background: #f8f9fc;">
+                                <td colspan="6" style="padding: 20px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <div>
+                                            <h4 style="margin: 0 0 5px 0; color: var(--primary);">{{ room.room_name }}</h4>
+                                            <p style="margin: 0; color: #666; font-size: 0.9rem;">{{ room.equipment }} • {{ room.capacity }} chỗ ngồi</p>
+                                        </div>
+                                        <div style="display: flex; gap: 10px;">
+                                            {% if room.status == 'Maintenance' %}
+                                                <button class="btn-premium btn-disabled" disabled><i class="fas fa-ban"></i> Đang bảo trì</button>
+                                            {% else %}
+                                                <button class="btn-premium btn-blue" onclick="window.location.href='/booking-scheduler?room_id={{ room.id }}'"><i class="fas fa-calendar-check"></i> Đặt lịch ngay</button>
+                                            {% endif %}
+
+                                            {% if role == 'admin' %}
+                                            <button class="btn-premium btn-yellow" onclick="showEditRoomModal({{ room.id }}, '{{ room.room_name }}', {{ room.capacity }}, '{{ room.equipment }}', '{{ room.status }}')"><i class="fas fa-pen"></i> Sửa</button>
+                                            <button class="btn-premium btn-red" onclick="deleteRoom({{ room.id }}, '{{ room.room_name }}')"><i class="fas fa-trash"></i> Xóa</button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="roomModal" class="modal">
+        <div class="modal-content">
+            <span onclick="closeModal()" style="float:right; cursor:pointer; font-size:24px; color: #999;">&times;</span>
+            <h2 id="modalTitle">Thông Tin Phòng</h2>
+            <form id="roomForm">
+                <input type="hidden" id="roomId" name="room_id">
+                <label>Tên phòng:</label><input type="text" id="roomName" name="room_name" required>
+                <label>Sức chứa:</label><input type="number" id="roomCapacity" name="capacity" required>
+                <label>Thiết bị:</label><input type="text" id="roomEquipment" name="equipment" required>
+                <label>Trạng thái:</label>
+                <select id="roomStatus" name="status">
+                    <option value="Available">🟢 Hoạt động</option>
+                    <option value="Maintenance">🟠 Bảo trì</option>
+                </select>
+                <button type="submit" id="submitBtn" class="submit-btn">Lưu lại</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // === HÀM LỌC TRẠNG THÁI (MỚI) ===
+        function filterStatus(status, btn) {
+            // 1. Cập nhật nút active
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // 2. Lọc bảng
+            const rows = document.querySelectorAll('.room-row');
+            const details = document.querySelectorAll('.room-details-row');
+            
+            // Ẩn tất cả dòng chi tiết để tránh lỗi giao diện
+            details.forEach(d => d.style.display = 'none');
+            // Reset nút "Chi tiết" về trạng thái đóng
+            document.querySelectorAll('.actions button').forEach(b => b.innerText = 'Chi tiết');
+
+            rows.forEach(row => {
+                const roomStatus = row.getAttribute('data-status'); // Lấy status từ data attribute
+                if (status === 'all' || roomStatus === status) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // === HÀM TÌM KIẾM (Đã tích hợp cùng bộ lọc) ===
+        // === HÀM TÌM KIẾM NÂNG CẤP (Tên phòng + Thiết bị) ===
+        function searchRooms() {
+            var input = document.getElementById("searchInput");
+            var filter = input.value.toUpperCase();
+            var rows = document.querySelectorAll('.room-row');
+            
+            // Ẩn các dòng chi tiết đang mở để tránh rối mắt khi tìm kiếm
+            document.querySelectorAll('.room-details-row').forEach(d => d.style.display = 'none');
+            document.querySelectorAll('.actions button').forEach(b => b.innerText = 'Chi tiết');
+
+            rows.forEach(row => {
+                // Lấy cột Tên phòng (vị trí index 1)
+                var nameCol = row.getElementsByTagName("td")[1];
+                // Lấy cột Thiết bị (vị trí index 3)
+                var equipCol = row.getElementsByTagName("td")[3];
+
+                if (nameCol && equipCol) {
+                    var nameTxt = nameCol.textContent || nameCol.innerText;
+                    var equipTxt = equipCol.textContent || equipCol.innerText;
+
+                    // Kiểm tra nếu Tên phòng HOẶC Thiết bị chứa từ khóa tìm kiếm
+                    if (nameTxt.toUpperCase().indexOf(filter) > -1 || equipTxt.toUpperCase().indexOf(filter) > -1) {
+                        row.style.display = "";
+                    } else {
+                        row.style.display = "none";
+                    }
+                }       
+            });
+        }
+
+        const modal = document.getElementById('roomModal');
+        const form = document.getElementById('roomForm');
+        let currentAction = '';
+
+        function closeModal() { modal.style.display = 'none'; form.reset(); }
+        
+        function showCreateRoomModal() {
+            document.getElementById('modalTitle').textContent = 'Thêm Phòng Mới';
+            currentAction = 'create';
+            form.action = '/api/rooms/create';
+            modal.style.display = 'block';
+        }
+
+        function showEditRoomModal(id, name, cap, eq, stat) {
+            document.getElementById('modalTitle').textContent = 'Sửa Phòng';
+            currentAction = 'update';
+            form.action = '/api/rooms/update';
+            document.getElementById('roomId').value = id;
+            document.getElementById('roomName').value = name;
+            document.getElementById('roomCapacity').value = cap;
+            document.getElementById('roomEquipment').value = eq;
+            document.getElementById('roomStatus').value = stat;
+            modal.style.display = 'block';
+        }
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(form).entries());
+            data.capacity = parseInt(data.capacity);
+            if(currentAction === 'update') data.room_id = parseInt(data.room_id);
+            
+            const res = await fetch(form.action, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            const result = await res.json();
+            if(result.status === 'success') { 
+                Swal.fire({ title: 'Thành công!', text: result.message, icon: 'success', confirmButtonColor: '#06d6a0' }).then(() => window.location.reload()); 
+            } else { Swal.fire('Lỗi', result.message, 'error'); }
+        };
+
+        function toggleDetails(btn, id) {
+            const row = document.getElementById('details-row-' + id);
+            const isHidden = row.style.display === 'none';
+            
+            // Đóng tất cả các dòng khác trước khi mở (để gọn gàng)
+            document.querySelectorAll('.room-details-row').forEach(d => d.style.display = 'none');
+            document.querySelectorAll('.actions button').forEach(b => b.innerText = 'Chi tiết');
+
+            if(isHidden) {
+                row.style.display = 'table-row';
+                btn.innerText = 'Đóng';
+            } else {
+                row.style.display = 'none';
+                btn.innerText = 'Chi tiết';
+            }
+        }
+
+        async function deleteRoom(id, name) {
+            Swal.fire({
+                title: `Xóa ${name}?`, text: "Không thể hoàn tác!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef233c', confirmButtonText: 'Xóa', cancelButtonText: 'Hủy'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const res = await fetch('/api/rooms/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({room_id: id}) });
+                    const d = await res.json();
+                    if(d.status==='success') Swal.fire('Đã xóa!', '', 'success').then(()=>window.location.reload());
+                    else Swal.fire('Lỗi', d.message, 'error');
+                }
+            });
+        }
+    </script>
+    <script>
+        // Khi trang tải xong, kiểm tra xem có yêu cầu lọc không
+        window.addEventListener('DOMContentLoaded', (event) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const filterParam = urlParams.get('filter'); // Lấy giá trị 'Available' từ URL
+
+            if (filterParam) {
+                // Tìm nút bấm tương ứng với bộ lọc này (Nút "Hoạt động")
+                // filterStatus('Available', this) -> tìm trong onclick
+                const btnToClick = document.querySelector(`button[onclick*="${filterParam}"]`);
+                
+                if (btnToClick) {
+                    // Tự động kích hoạt hành động lọc
+                    filterStatus(filterParam, btnToClick);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

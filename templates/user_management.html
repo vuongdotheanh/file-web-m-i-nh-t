@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản Lý Người Dùng - EduManager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root { --primary: #4361ee; --success: #06d6a0; --warning: #ff9f1c; --danger: #ef233c; --dark: #2b2d42; }
+        
+        /* User Role Badge */
+        .role-badge { padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; }
+        .role-admin { background: #e0e7ff; color: #4361ee; }
+        .role-teacher { background: #f3e8ff; color: #7209b7; }
+        .role-student { background: #e6fffa; color: #06d6a0; }
+
+        /* Buttons */
+        .btn-premium { border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .btn-premium:hover { transform: translateY(-2px); }
+        .btn-blue { background: linear-gradient(135deg, #4361ee, #3a0ca3); color: white; }
+        .btn-red { background: linear-gradient(135deg, #ef233c, #d90429); color: white; }
+        
+        /* Modal */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .modal-content { background: white; margin: 5% auto; padding: 30px; border-radius: 20px; width: 500px; box-shadow: 0 25px 50px rgba(0,0,0,0.25); animation: slideDown 0.3s; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-50px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #333; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 2px solid #eee; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+        .form-group input:focus { border-color: var(--primary); outline: none; }
+        
+        .submit-btn { width: 100%; padding: 12px; background: var(--success); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+       <aside class="sidebar">
+            <div class="logo" style="color: var(--color-bar);"><i class="fas fa-graduation-cap"></i><span>EduManager</span></div>
+            <nav>
+                <ul>
+                    <li><a href="/dashboard"><i class="fas fa-th-large"></i> Tổng quan</a></li>
+                    
+                    <li><a href="/booking-scheduler"><i class="fas fa-calendar-alt"></i> Lịch đặt phòng</a></li>
+                    
+                    <li><a href="/room-management"><i class="fas fa-door-open"></i> Quản lý phòng học</a></li>
+                    
+                    {% if role == 'admin' %}
+                    <li class="active"><a href="/user-management"><i class="fas fa-users-cog"></i> Quản lý người dùng</a></li>
+                    {% endif %}
+                    
+                    <li><a href="/profile"><i class="fas fa-user-circle"></i> Quản lý tài khoản</a></li>
+                    
+                    <li class="logout-item" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px;">
+                        <a href="/logout" style="color: #ef233c !important;"><i class="fas fa-sign-out-alt"></i> Đăng xuất</a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header>
+                <div style="visibility: hidden;"></div>
+                <div class="user-profile">
+                    <div class="info"><strong>{{ full_name if full_name else username }}</strong> ({{ role }})</div>
+                    
+                    <img src="https://ui-avatars.com/api/?name={{ full_name if full_name else username }}&background=4361ee&color=fff&size=128" alt="Avatar">
+                </div>
+            </header>
+
+            <section class="data-section">
+                <div class="section-header">
+                    <h2>Danh sách Người dùng</h2>
+                    </div>
+                
+                <div class="table-container">
+                    <table id="userTable">
+                        <thead><tr><th>ID</th><th>Tên đăng nhập</th><th>Email</th><th>SĐT</th><th>Vai trò</th><th>Hành động</th></tr></thead>
+                        <tbody>
+                            {% for u in users %}
+                            <tr class="user-row">
+                                <td>#{{ u.id }}</td>
+                                <td><strong>{{ u.username }}</strong></td>
+                                <td>{{ u.email }}</td>
+                                <td>{{ u.phone }}</td>
+                                <td>
+                                    {% if u.role == 'admin' %} <span class="role-badge role-admin">Quản trị viên</span>
+                                    {% elif u.role == 'teacher' %} <span class="role-badge role-teacher">Giáo viên</span>
+                                    {% else %} <span class="role-badge role-student">Sinh viên</span> {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn-premium btn-blue" 
+                                        onclick="showEditUserModal({{ u.id }}, '{{ u.username }}', '{{ u.email }}', '{{ u.phone }}', '{{ u.role }}')">
+                                        <i class="fas fa-edit"></i> Sửa
+                                    </button>
+                                    
+                                    {% if u.username != username %} <button class="btn-premium btn-red" onclick="deleteUser({{ u.id }}, '{{ u.username }}')">
+                                        <i class="fas fa-trash"></i> Xóa
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <span onclick="closeModal()" style="float:right; cursor:pointer; font-size:24px;">&times;</span>
+            <h2 style="margin-top:0; color:var(--primary);">Cập nhật Người dùng</h2>
+            
+            <form id="userForm">
+                <input type="hidden" id="userId" name="user_id">
+                
+                <div class="form-group">
+                    <label>Tên đăng nhập (Không đổi):</label>
+                    <input type="text" id="userName" disabled style="background:#f9f9f9; color:#666;">
+                </div>
+
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="userEmail" name="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Số điện thoại:</label>
+                    <input type="text" id="userPhone" name="phone">
+                </div>
+
+                <div class="form-group">
+                    <label>Vai trò:</label>
+                    <select id="userRole" name="role">
+                        <option value="student">Sinh viên</option>
+                        <option value="teacher">Giáo viên</option>
+                        <option value="admin">Quản trị viên</option>
+                    </select>
+                </div>
+
+                <hr style="border: 0; border-top: 1px dashed #ccc; margin: 15px 0;">
+                
+                <div class="form-group">
+                    <label style="color: #ef233c;"><i class="fas fa-key"></i> Đổi mật khẩu mới (Nếu cần):</label>
+                    <input type="password" id="newPassword" name="new_password" placeholder="Bỏ trống nếu không muốn đổi">
+                </div>
+
+                <button type="submit" class="submit-btn">Lưu Thay Đổi</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const modal = document.getElementById('userModal');
+        const form = document.getElementById('userForm');
+
+        function closeModal() { modal.style.display = 'none'; form.reset(); }
+
+        function showEditUserModal(id, username, email, phone, role) {
+            document.getElementById('userId').value = id;
+            document.getElementById('userName').value = username;
+            document.getElementById('userEmail').value = (email === 'None') ? '' : email;
+            document.getElementById('userPhone').value = (phone === 'None') ? '' : phone;
+            document.getElementById('userRole').value = role;
+            document.getElementById('newPassword').value = ''; // Reset mật khẩu
+            modal.style.display = 'block';
+        }
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(form).entries());
+            data.user_id = parseInt(data.user_id);
+
+            const res = await fetch('/api/users/update', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            
+            if (result.status === 'success') {
+                Swal.fire({ title: 'Thành công!', text: result.message, icon: 'success' }).then(() => window.location.reload());
+            } else {
+                Swal.fire('Lỗi!', result.message, 'error');
+            }
+        };
+
+        async function deleteUser(id, name) {
+            Swal.fire({
+                title: `Xóa user "${name}"?`,
+                text: "Hành động này không thể hoàn tác!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef233c',
+                confirmButtonText: 'Xóa ngay'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const res = await fetch('/api/users/delete', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ user_id: id })
+                    });
+                    const data = await res.json();
+                    if(data.status === 'success') {
+                        Swal.fire('Đã xóa!', '', 'success').then(() => window.location.reload());
+                    } else {
+                        Swal.fire('Lỗi!', data.message, 'error');
+                    }
+                }
+            });
+        }
+
+        function searchUsers() {
+            var input = document.getElementById("searchInput");
+            var filter = input.value.toUpperCase();
+            var rows = document.getElementsByClassName("user-row");
+            for (var i = 0; i < rows.length; i++) {
+                var name = rows[i].getElementsByTagName("td")[1].textContent;
+                var email = rows[i].getElementsByTagName("td")[2].textContent;
+                if (name.toUpperCase().indexOf(filter) > -1 || email.toUpperCase().indexOf(filter) > -1) {
+                    rows[i].style.display = "";
+                } else {
+                    rows[i].style.display = "none";
+                }
+            }
+        }
+    </script>
+</body>
+</html>

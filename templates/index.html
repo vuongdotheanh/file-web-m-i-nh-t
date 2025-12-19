@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Quản Lý Lớp Học</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo">
+                <a href="/dashboard" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-graduation-cap"></i><span>EduManager</span>
+                </a>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="/dashboard" class="active"><i class="fas fa-th-large"></i> Tổng quan</a></li>
+                    
+                    {% if role == 'admin' or role == 'teacher' %}
+                    <li><a href="/booking-scheduler"><i class="fas fa-calendar-alt"></i> Lịch đặt phòng</a></li>
+                    <li><a href="/room-management"><i class="fas fa-door-open"></i> Quản lý phòng học</a></li>
+                    {% endif %}
+                    
+                    {% if role == 'admin' %}
+                    <li><a href="/user-management"><i class="fas fa-user-shield"></i> Quản lý người dùng</a></li>
+                    {% endif %}
+
+                    <li><a href="/profile"><i class="fas fa-user-circle"></i> Quản lý tài khoản</a></li>
+
+                    <li class="logout-item"><a href="/logout" style="color: #ef233c;"><i class="fas fa-sign-out-alt"></i> Đăng xuất</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                
+                <div style="visibility: hidden;"></div>
+
+                <div class="user-profile">
+                    <div class="info"><strong>{{ full_name if full_name else username }}</strong> ({{ role }})</div>
+                    
+                    <img src="https://ui-avatars.com/api/?name={{ full_name if full_name else username }}&background=4361ee&color=fff&size=128" alt="Avatar">
+                </div>
+            </header>
+
+            <section class="stats-grid">
+                <div class="stat-card purple" onclick="window.location.href='/room-management'" style="cursor: pointer;">
+                    <div class="stat-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+                    <div class="stat-info">
+                        <h3>Tổng số phòng</h3>
+                        <p>{{ total_rooms }}</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card green" onclick="window.location.href='/room-management?filter=Available'" style="cursor: pointer;">
+                    <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-info">
+                        <h3>Đang hoạt động</h3>
+                        <p>{{ active_rooms }}</p>
+                    </div>
+                </div>
+
+                {% if role == 'admin' %}
+                <div class="stat-card red" onclick="window.location.href='/booking-scheduler'" style="cursor: pointer;">
+                {% else %}
+                <div class="stat-card red" onclick="window.location.href='/profile'" style="cursor: pointer;">
+                {% endif %}
+                    <div class="stat-icon"><i class="fas fa-history"></i></div>
+                    <div class="stat-info">
+                        <h3>Lịch Đặt ({{ 'Tất cả' if role == 'admin' else 'Của bạn' }})</h3>
+                        <p>{{ booking_count }}</p>
+                    </div>
+                </div>
+            </section>
+            <section class="data-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-clock" style="color: #4361ee; margin-right: 10px;"></i> Lịch sử đặt phòng gần đây</h2>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Người đặt</th>
+                                <th>Phòng</th>
+                                <th>Thời gian bắt đầu</th>
+                                <th>Thời lượng</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in history %}
+                            <tr>
+                                <td><strong>{{ item.booker }}</strong></td>
+                                <td>{{ item.room_name }}</td>
+                                <td>
+                                    {{ item.time.split('T')[0] }}
+                                    <span style="color:#888; font-size:0.8rem;"> ({{ item.time.split('T')[1][:5] }})</span>
+                                </td>
+                                <td>{{ item.duration }}</td>
+                                <td>
+                                    <span style="background:#e6fffa; color:#06d6a0; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">Thành công</span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" style="text-align:center; padding: 20px; color:#888;">Chưa có lịch đặt phòng nào.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
