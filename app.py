@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from json import dumps as json_dumps
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
 from fastapi import FastAPI, Request, Depends, HTTPException, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -65,8 +64,10 @@ class User(Base):
     email = Column(String, unique=True) 
     phone = Column(String) 
     role = Column(String, default="teacher")
-    full_name = Column(String)
     verification_code = Column(String, nullable=True)
+    username = Column(String, unique=True, index=True) # Có unique=True (Không được trùng)
+    email = Column(String, unique=True)                # Có unique=True
+    full_name = Column(String)                         # KH
 
 class Classroom(Base):
     __tablename__ = "classrooms"
@@ -141,7 +142,24 @@ async def register_send_otp(data: dict, db: Session = Depends(get_db)):
 #  KÝ BƯỚC 2: XÁC NHẬN & TẠO USER 
 @app.post("/api/register/confirm")
 async def register_confirm(data: dict, db: Session = Depends(get_db)):
-    # Tạo user mới 
+    # 1. Kiểm tra User tồn tại (Username)
+    if db.query(User).filter(User.username == data['username']).first():
+        return {"status": "error", "message": "Tên đăng nhập này đã có người sử dụng!"}
+
+    # --- THÊM ĐOẠN NÀY ĐỂ CHẶN TRÙNG HỌ TÊN ---
+    # Kiểm tra xem Họ tên này đã có trong database chưa
+    if db.query(User).filter(User.full_name == data['full_name']).first():
+        return {"status": "error", "message": "Họ và tên này đã tồn tại! Vui lòng thêm ký tự để phân biệt."}
+    # ------------------------------------------
+
+    # 2. KIỂM TRA MẬT KHẨU (Như đã làm ở bước trước)
+    password = data['password']
+    if len(password) <= 8:
+        return {"status": "error", "message": "Mật khẩu phải dài hơn 8 ký tự!"}
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return {"status": "error", "message": "Mật khẩu phải có ít nhất 1 ký tự đặc biệt!"}
+
+    # 3. Tạo user mới
     new_user = User(
         username=data['username'], 
         password=data['password'], 
@@ -332,7 +350,7 @@ async def create_room(data: dict, db: Session = Depends(get_db), current_user: U
     db.commit()
     return {"status": "success"}
 
-# --- API CẬP NHẬT PHÒNG (ĐÃ NÂNG CẤP: TỰ ĐỘNG XÓA LỊCH KHI BẢO TRÌ) ---
+# --- API CẬP NHẬT PHÒNG 
 @app.post("/api/rooms/update")
 async def update_room(data: dict, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     # 1. Tìm phòng cần sửa
@@ -344,9 +362,9 @@ async def update_room(data: dict, db: Session = Depends(get_db), current_user: U
     new_status = data.get('status')
 
     # 3. KIỂM TRA LOGIC BẢO TRÌ
-    # Nếu chuyển từ trạng thái khác sang 'Maintenance' -> Xóa hết lịch đặt
+    # Chuuyeern sang btri thì sẽ xóa các lịch đã đặt
     if new_status == 'Maintenance':
-        # Lệnh này sẽ xóa toàn bộ Booking có room_id tương ứng
+       
         deleted_count = db.query(Booking).filter(Booking.room_id == r.id).delete()
         print(f"Đã hủy {deleted_count} lịch đặt do phòng {r.room_name} bảo trì.")
 
@@ -453,13 +471,13 @@ async def profile(request: Request, db: Session = Depends(get_db)):
     history = [{"room_name": (db.query(Classroom).filter(Classroom.id==b.room_id).first().room_name if db.query(Classroom).filter(Classroom.id==b.room_id).first() else "Unknown"), "start_time": b.start_time, "duration": b.duration_hours, "status": b.status} for b in user_bookings]
     return templates.TemplateResponse("profile.html", {"request": request, "user": u, "username": u.username, "role": u.role, "full_name": u.full_name, "history": history})
 
-# --- SỰ KIỆN KHỞI ĐỘNG (TẠO DỮ LIỆU MẪU) ---
+# --- SỰ KIỆN KHỞI ĐỘNG (TẠO DỮ LIỆU MẪU)
 @app.on_event("startup")
 def startup_event():
     db = SessionLocal()
     # Tạo Admin mặc định nếu chưa có
     if not db.query(User).filter(User.username == "admin").first():
-        db.add(User(username="admin", password="123", role="admin", full_name="Quản Trị Viên", email="admin@edu.vn", phone="0999999999"))
+        db.add(User(username="admin", password="123", role="admin", full_name="Thế Anh", email="admin@edu.vn", phone="0999999999"))
     
     # Tạo Phòng học mẫu nếu chưa có
     if not db.query(Classroom).first():
@@ -473,7 +491,6 @@ def startup_event():
     db.close()
 
 #ip đổi mật khẩu
-# --- Thêm đoạn này vào app.py để sửa lỗi 404 ---
 
 @app.post("/api/profile/change-password")
 async def profile_change_pass(data: dict, request: Request, db: Session = Depends(get_db)):

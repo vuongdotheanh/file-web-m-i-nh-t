@@ -134,7 +134,7 @@
             const otpInput = document.getElementById('reg-otp').value;
             const otpServer = document.getElementById('server-otp-hash').value;
 
-            // 1. Kiểm tra OTP trước
+            // 1. Kiểm tra OTP 
             if(otpInput !== otpServer) {
                 Swal.fire('Sai mã OTP', 'Mã xác thực bạn nhập không đúng!', 'error');
                 return;
@@ -150,6 +150,20 @@
 
             if(!fullname || !ph || !p) { Swal.fire('Thiếu thông tin', 'Vui lòng điền đầy đủ!', 'warning'); return; }
             if(p !== c) { Swal.fire('Lỗi', 'Mật khẩu xác nhận không khớp', 'error'); return; }
+
+            // Kiểm tra độ dài trên 8 
+            if (p.length <= 8) {
+                Swal.fire('Mật khẩu yếu', 'Mật khẩu phải có trên 8 ký tự!', 'warning');
+                return;
+            }
+
+            // Kiểm tra ký tự đặc biệt bằng Regex
+            // Các ký tự đặc biệt: ! @ # $ % ^ & * ( ) , . ? " : { } | < >
+            const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
+            if (!specialCharRegex.test(p)) {
+                Swal.fire('Mật khẩu yếu', 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (ví dụ: @, #, !...)', 'warning');
+                return;
+            }
 
             // 3. Gửi đăng ký hoàn tất
             try {
